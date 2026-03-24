@@ -20,6 +20,10 @@ class Assignment1:
         self.mThreads = []             # list for machine threads
         self.pThreads = []             # list for printer threads
 
+        self.queue_lock = threading.Lock()
+        self.empty_slots = threading.Semaphore(5)
+        self.filled_slots = threading.Semaphore(0)
+
     def startSimulation(self):
         # Create Machine and Printer threads
         # Write code here
@@ -41,6 +45,22 @@ class Assignment1:
 
         # Finish simulation
         self.sim_active = False
+        
+        #task 2
+        for _ in range(self.NUM_MACHINES):
+            self.empty_slots.release()
+        
+        for _ in range(self.NUM_PRINTERS):
+            self.filled_slots.release()
+
+        for printer in self.pThreads:
+            printer.join()
+        
+        for machine in self.mThreads:
+            machine.join()
+
+
+
 
         # Wait until all printer threads finish by joining them
         # Write code here
@@ -60,6 +80,17 @@ class Assignment1:
             while self.outer.sim_active:
                 # Simulate printer taking some time to print the document
                 self.printerSleep()
+
+                self.outer.filled_slots.acquire()
+                
+                if not self.outer.sim_active:
+                    break
+
+                with self.outer.queue_lock:
+
+                    self.printDox(self.printerID)
+
+                self.outer.empty_slots.relaese()
                 # Grab the request at the head of the queue and print it
                 # Write code here
             while self.outer.sim_active:
@@ -86,6 +117,20 @@ class Assignment1:
             while self.outer.sim_active:
                 # Machine sleeps for a random amount of time
                 self.machineSleep()
+                # Task 2
+                self.outer.empty_slots.acquire()
+
+                if not self.outer.sim_active:
+                    break
+
+                self.outer.queue_lock.acquire()
+
+                self.printRequest(self.machineID)
+
+                self.outer.queue_lock.release()
+
+                self.outer.filled_slots.release()
+
                 # Machine wakes up and sends a print request
                 # Write code here
             while self.outer.sim_active:
